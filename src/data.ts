@@ -73,39 +73,59 @@ async function fetchBuf(url: string, ms = 120_000): Promise<Buffer> {
 
 // ------------------------------------------------------------------ RPL (CSV)
 
-/** RFC4180-ish CSV with ";" separator and quoted multi-line fields. */
+/** RFC4180-ish CSV with ";" separator and quoted multi-line fields (slice-based, no per-char concatenation). */
 export function parseCsv(text: string, sep = ";"): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
-  let f = "";
-  let q = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (q) {
-      if (c === '"') {
-        if (text[i + 1] === '"') {
-          f += '"';
-          i++;
-        } else q = false;
-      } else f += c;
-    } else if (c === '"') q = true;
-    else if (c === sep) {
-      row.push(f);
-      f = "";
-    } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(f);
-      rows.push(row);
-      row = [];
-      f = "";
-    } else f += c;
-  }
-  if (f || row.length) {
-    row.push(f);
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    let field: string;
+    if (text[i] === '"') {
+      let j = i + 1;
+      let parts: string[] | null = null;
+      let start = j;
+      for (;;) {
+        const k = text.indexOf('"', j);
+        if (k < 0) {
+          j = n;
+          break;
+        }
+        if (text[k + 1] === '"') {
+          (parts ??= []).push(text.slice(start, k + 1));
+          j = k + 2;
+          start = j;
+          continue;
+        }
+        j = k;
+        break;
+      }
+      field = parts ? parts.join("") + text.slice(start, j) : text.slice(start, j);
+      i = j + 1;
+    } else {
+      let j = i;
+      while (j < n && text[j] !== sep && text[j] !== "\n" && text[j] !== "\r") j++;
+      field = text.slice(i, j);
+      i = j;
+    }
+    row.push(field);
+    if (i >= n) break;
+    if (text[i] === sep) {
+      i++;
+      if (i >= n) row.push("");
+      continue;
+    }
+    if (text[i] === "\r" && text[i + 1] === "\n") i++;
+    if (text[i] === "\n" || text[i] === "\r") i++;
     rows.push(row);
+    row = [];
   }
+  if (row.length) rows.push(row);
   return rows;
 }
+
+/** Copy a string so it does not keep the whole source text alive (V8 sliced strings). */
+const own = (s: string) => (s ? Buffer.from(s, "utf8").toString("utf8") : "");
 
 export function parsePacks(s: string): Pack[] {
   const lines = s.split(/\r?\n/).map((l) => l.trim());
@@ -115,7 +135,7 @@ export function parsePacks(s: string): Pack[] {
     if (parts.length >= 2 && /^\d{8,14}$/.test(parts[0])) {
       const content: string[] = [];
       while (i + 1 < lines.length && !lines[i + 1].includes("¦")) content.push(lines[++i]);
-      out.push({ gtin: parts[0], cat: parts[1], content: content.join(" ").trim() });
+      out.push({ gtin: own(parts[0]), cat: own(parts[1]), content: own(content.join(" ").trim()) });
     }
   }
   return out;
@@ -146,17 +166,17 @@ export function parseRpl(text: string): Product[] {
     if (r.length < 10) continue;
     if (c.kind >= 0 && r[c.kind] && r[c.kind] !== "Ludzki") continue;
     out.push({
-      id: r[c.id] ?? "",
-      name: r[c.name] ?? "",
-      inn: r[c.inn] ?? "",
-      strength: r[c.strength] ?? "",
-      form: r[c.form] ?? "",
-      atc: r[c.atc] ?? "",
-      holder: r[c.holder] ?? "",
-      substance: (r[c.substance] ?? "").replace(/\s+/g, " "),
-      validity: r[c.validity] ?? "",
-      leaflet: r[c.leaflet] ?? "",
-      spc: r[c.spc] ?? "",
+      id: own(r[c.id] ?? ""),
+      name: own(r[c.name] ?? ""),
+      inn: own(r[c.inn] ?? ""),
+      strength: own(r[c.strength] ?? ""),
+      form: own(r[c.form] ?? ""),
+      atc: own(r[c.atc] ?? ""),
+      holder: own(r[c.holder] ?? ""),
+      substance: own((r[c.substance] ?? "").replace(/\s+/g, " ")),
+      validity: own(r[c.validity] ?? ""),
+      leaflet: own(r[c.leaflet] ?? ""),
+      spc: own(r[c.spc] ?? ""),
       packs: parsePacks(r[c.packs] ?? ""),
     });
   }
