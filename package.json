@@ -1,6 +1,6 @@
 {
   "name": "leki-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for Polish medicines: official prices of refunded drugs, patient co-payment, cheaper substitutes, free drugs for 65+/children/pregnant, prescription status and leaflets. No API key.",
   "type": "module",
   "bin": {
