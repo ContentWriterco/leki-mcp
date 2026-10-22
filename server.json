@@ -1,0 +1,11 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.ContentWriterco/leki-mcp",
+  "description": "Polish medicines: refunded drug prices, patient co-payment and cheaper substitutes",
+  "repository": { "url": "https://github.com/ContentWriterco/leki-mcp", "source": "github" },
+  "version": "0.1.0",
+  "packages": [
+    { "registryType": "npm", "identifier": "leki-mcp", "version": "0.1.0", "transport": { "type": "stdio" } }
+  ],
+  "remotes": [{ "type": "streamable-http", "url": "https://leki.compabase.com/mcp" }]
+}
